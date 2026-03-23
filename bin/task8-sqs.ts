@@ -1,20 +1,58 @@
-#!/usr/bin/env node
-import * as cdk from 'aws-cdk-lib/core';
-import { Task8SqsStack } from '../lib/task8-sqs-stack';
+import {
+  SQSClient,
+  SendMessageCommand,
+  ReceiveMessageCommand,
+  DeleteMessageCommand,
+} from "@aws-sdk/client-sqs";
 
-const app = new cdk.App();
-new Task8SqsStack(app, 'Task8SqsStack', {
-  /* If you don't specify 'env', this stack will be environment-agnostic.
-   * Account/Region-dependent features and context lookups will not work,
-   * but a single synthesized template can be deployed anywhere. */
+const client = new SQSClient({ region: "ap-south-1" });
 
-  /* Uncomment the next line to specialize this stack for the AWS Account
-   * and Region that are implied by the current CLI configuration. */
-  // env: { account: process.env.CDK_DEFAULT_ACCOUNT, region: process.env.CDK_DEFAULT_REGION },
+// 👉 Replace with your Queue URL
+const queueUrl = "https://sqs.ap-south-1.amazonaws.com/669468173289/task8-queue";
 
-  /* Uncomment the next line if you know exactly what Account and Region you
-   * want to deploy the stack to. */
-  // env: { account: '123456789012', region: 'us-east-1' },
+async function sendMessage() {
+  const command = new SendMessageCommand({
+    QueueUrl: queueUrl,
+    MessageBody: "Task 8 message from SDK",
+  });
 
-  /* For more information, see https://docs.aws.amazon.com/cdk/latest/guide/environments.html */
+  const response = await client.send(command);
+  console.log("Message sent successfully");
+  console.log("Message ID:", response.MessageId);
+}
+
+async function pollMessage() {
+  const command = new ReceiveMessageCommand({
+    QueueUrl: queueUrl,
+    MaxNumberOfMessages: 1,
+    WaitTimeSeconds: 5,
+  });
+
+  const response = await client.send(command);
+
+  if (response.Messages && response.Messages.length > 0) {
+    const message = response.Messages[0];
+    console.log("Message received:", message.Body);
+
+    if (message.ReceiptHandle) {
+      const deleteCommand = new DeleteMessageCommand({
+        QueueUrl: queueUrl,
+        ReceiptHandle: message.ReceiptHandle,
+      });
+
+      await client.send(deleteCommand);
+      console.log("Message deleted successfully");
+    }
+  } else {
+    console.log("No messages available in the queue");
+  }
+}
+
+async function main() {
+  await sendMessage();
+  await pollMessage();
+}
+
+main().catch((error) => {
+  console.error("Error:", error);
 });
